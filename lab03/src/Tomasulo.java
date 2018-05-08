@@ -1,4 +1,3 @@
-﻿
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -64,17 +63,30 @@ public class Tomasulo extends JFrame implements ActionListener{
 	 * 每个面板的名称
 	 */
 	private JLabel inst_typel, timel, tl1,tl2,tl3,tl4,resl,regl,ldl,insl,stepsl;
-	private int time[]=new int[4];
+	private int time[]=new int[4];	//各个浮点运算及载入执行时间
 
 	/*
 	 * 部件执行时间的输入框
 	 */
 	private JTextField tt1,tt2,tt3,tt4;
 
-	private int intv[][]=new int[6][4],cnow,inst_typenow=0;
-	private int cal[][]={{-1,0,0},{-1,0,0},{-1,0,0},{-1,0,0},{-1,0,0}};
-	private int ld[][]={{0,0},{0,0},{0,0}};
-	private int ff[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	private int intv[][]=new int[6][4],		//输入的指令的类型及操作数等的序号
+				cnow,						//当前周期数
+				inst_typenow=0;				//当前指令类型？
+	private int cal[][]={{-1,0,0},{-1,0,0},{-1,0,0},{-1,0,0},{-1,0,0}};	//浮点运算部件的剩余时间，
+	private int ld[][]={{0,0},{0,0},{0,0}};								//Load的地址，值
+	private int ff[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};				//浮点寄存器的状态序列号
+
+	private int istime[] = new int[6];
+	private int exetime[][] = new int[6][2];
+	private int wbtime[] = new int[6];
+	//private int loadhead = -1;		//当前存储序列的头的序号
+	private int inst_pos = 0;		//当前执行的指令序号
+	private int calresttime[] = {-1, -1, -1, -1, -1};	//浮点运算部件的剩余时间
+	private int ldrestime[] = {-1, -1, -1};				//Load部件剩余时间
+	private int inst_rs[] = new int[6];		//指令与其对应的保留站
+	private String regsrc[] = new String[16];	//寄存器结果来源（其实本来直接用寄存器表就行了，但是为了和示例保持一致只能这样）
+	private int memcnt;
 
 	/*
 	 * (1)说明：根据你的设计完善指令设置中的下拉框内容
@@ -87,8 +99,8 @@ public class Tomasulo extends JFrame implements ActionListener{
 					regist_table[]={"F0","F2","F4","F6","F8","F10","F12","F14","F16"
 							,"F18","F20","F22","F24","F26","F28","F30","F32"},
 					rx[]={"R0","R1","R2","R3","R4","R5","R6"},
-					ix[]={"0","1","2","3","4","5","6","7"};
-
+					ix[]={"0","1","2","3","4","5","6","7", "8", "9", "10","11","12","13","14","15","16","17", "18", "19", "20","21","22","23","24","25","26","27", "28", "29", "30", "31"};
+	
 	/*
 	 * (2)说明：请根据你的设计指定各个面板（指令状态，保留站，Load部件，寄存器部件）的大小
 	 * 		指令状态 面板
@@ -97,8 +109,10 @@ public class Tomasulo extends JFrame implements ActionListener{
 	 * 		寄存器 面板
 	 * 					的大小
 	 */
-	private	String  my_inst_type[][]=new String[7][4], my_rs[][]=new String[6][8],
-					my_load[][]=new String[4][4], my_regsters[][]=new String[3][17];
+	private	String  my_inst_type[][]=new String[7][4],		//显示在指令状态面板的内容
+					my_rs[][]=new String[6][8],				//显示在保留站面板中内容
+					my_load[][]=new String[4][4],			//显示在Load部件面板中的内容
+					my_regsters[][]=new String[3][17];		//显示在寄存器面板中的内容
 	private	JLabel  inst_typejl[][]=new JLabel[7][4], resjl[][]=new JLabel[6][8],
 					ldjl[][]=new JLabel[4][4], regjl[][]=new JLabel[3][17];
 
@@ -108,8 +122,11 @@ public class Tomasulo extends JFrame implements ActionListener{
 
 		//设置布局
 		Container cp=getContentPane();
+		//cp.setPreferredSize(new Dimension(800, 1000));
 		FlowLayout layout=new FlowLayout();
 		cp.setLayout(layout);
+		//cp.setSize(new Dimension(800, 1000));
+		//cp.setVisible(true);
 
 		//指令设置。GridLayout(int 指令条数, int 操作码+操作数, int hgap, int vgap)
 		inst_typel = new JLabel("指令设置");
@@ -143,7 +160,7 @@ public class Tomasulo extends JFrame implements ActionListener{
 		//Load部件
 		ldl = new JLabel("Load部件");
 		Load_panel = new JPanel(new GridLayout(4,4,0,0));
-		Load_panel.setPreferredSize(new Dimension(200, 100));
+		Load_panel.setPreferredSize(new Dimension(450, 100));
 		Load_panel.setBorder(new EtchedBorder(EtchedBorder.RAISED));
 
 		tl1 = new JLabel("Load");
@@ -205,35 +222,35 @@ public class Tomasulo extends JFrame implements ActionListener{
 		 * (3)说明：设置界面默认指令，根据你设计的指令，操作数等的选择范围进行设置。
 		 * 默认6条指令。待修改
 		 */
-//		inst_typebox[0].setSelectedIndex(1);
-//		inst_typebox[1].setSelectedIndex(3);
-//		inst_typebox[2].setSelectedIndex(21);
-//		inst_typebox[3].setSelectedIndex(2);
-//
-//		inst_typebox[4].setSelectedIndex(1);
-//		inst_typebox[5].setSelectedIndex(1);
-//		inst_typebox[6].setSelectedIndex(20);
-//		inst_typebox[7].setSelectedIndex(3);
-//
-//		inst_typebox[8].setSelectedIndex(4);
-//		inst_typebox[9].setSelectedIndex(0);
-//		inst_typebox[10].setSelectedIndex(1);
-//		inst_typebox[11].setSelectedIndex(2);
-//
-//		inst_typebox[12].setSelectedIndex(3);
-//		inst_typebox[13].setSelectedIndex(4);
-//		inst_typebox[14].setSelectedIndex(3);
-//		inst_typebox[15].setSelectedIndex(1);
-//
-//		inst_typebox[16].setSelectedIndex(5);
-//		inst_typebox[17].setSelectedIndex(5);
-//		inst_typebox[18].setSelectedIndex(0);
-//		inst_typebox[19].setSelectedIndex(3);
-//
-//		inst_typebox[20].setSelectedIndex(2);
-//		inst_typebox[21].setSelectedIndex(3);
-//		inst_typebox[22].setSelectedIndex(4);
-//		inst_typebox[23].setSelectedIndex(1);
+		inst_typebox[0].setSelectedIndex(1);
+		inst_typebox[1].setSelectedIndex(3);
+		inst_typebox[2].setSelectedIndex(21);
+		inst_typebox[3].setSelectedIndex(2);
+
+		inst_typebox[4].setSelectedIndex(1);
+		inst_typebox[5].setSelectedIndex(1);
+		inst_typebox[6].setSelectedIndex(20);
+		inst_typebox[7].setSelectedIndex(3);
+
+		inst_typebox[8].setSelectedIndex(4);
+		inst_typebox[9].setSelectedIndex(0);
+		inst_typebox[10].setSelectedIndex(1);
+		inst_typebox[11].setSelectedIndex(2);
+
+		inst_typebox[12].setSelectedIndex(3);
+		inst_typebox[13].setSelectedIndex(4);
+		inst_typebox[14].setSelectedIndex(3);
+		inst_typebox[15].setSelectedIndex(1);
+
+		inst_typebox[16].setSelectedIndex(5);
+		inst_typebox[17].setSelectedIndex(5);
+		inst_typebox[18].setSelectedIndex(0);
+		inst_typebox[19].setSelectedIndex(3);
+
+		inst_typebox[20].setSelectedIndex(2);
+		inst_typebox[21].setSelectedIndex(3);
+		inst_typebox[22].setSelectedIndex(4);
+		inst_typebox[23].setSelectedIndex(1);
 
 //执行时间设置
 		EX_time_set_panel.add(tl1);
@@ -314,7 +331,7 @@ public class Tomasulo extends JFrame implements ActionListener{
 		stepsl.setVisible(false);
 		Registers_state_panel.setVisible(false);
 		regl.setVisible(false);
-		setSize(820,620);
+		setSize(820,820);
 		setVisible(true);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	}
@@ -327,14 +344,14 @@ public class Tomasulo extends JFrame implements ActionListener{
 		for (int i=0;i<6;i++){
 			intv[i][0]=inst_typebox[i*4].getSelectedIndex();
 			if (intv[i][0]!=0){
-				intv[i][1]=2*inst_typebox[i*4+1].getSelectedIndex();
+				intv[i][1]=inst_typebox[i*4+1].getSelectedIndex();
 				if (intv[i][0]==1){
 					intv[i][2]=inst_typebox[i*4+2].getSelectedIndex();
 					intv[i][3]=inst_typebox[i*4+3].getSelectedIndex();
 				}
 				else {
-					intv[i][2]=2*inst_typebox[i*4+2].getSelectedIndex();
-					intv[i][3]=2*inst_typebox[i*4+3].getSelectedIndex();
+					intv[i][2]=inst_typebox[i*4+2].getSelectedIndex();
+					intv[i][3]=inst_typebox[i*4+3].getSelectedIndex();
 				}
 			}
 		}
@@ -402,6 +419,8 @@ public class Tomasulo extends JFrame implements ActionListener{
 				else {
 					disp=disp+regist_table[inst_typebox[temp*4+1].getSelectedIndex()]+','+regist_table[inst_typebox[temp*4+2].getSelectedIndex()]+','+regist_table[inst_typebox[temp*4+3].getSelectedIndex()];
 				}
+
+				
 				my_inst_type[i][j]=disp;
 			}
 			else my_inst_type[i][j]="";
@@ -426,6 +445,11 @@ public class Tomasulo extends JFrame implements ActionListener{
 		for (int i=0;i<3;i++)
 			for (int j=0;j<2;j++) ld[i][j]=0;
 		for (int i=0;i<17;i++) ff[i]=0;
+
+		cnow = 0;
+		inst_pos = 0;
+		initTime();
+		memcnt = 0;
 	}
 
 /*
@@ -492,6 +516,11 @@ public class Tomasulo extends JFrame implements ActionListener{
 			stepsl.setVisible(false);
 			Registers_state_panel.setVisible(false);
 			regl.setVisible(false);
+
+			inst_pos = 0;
+			cnow = 0;
+			initTime();
+			memcnt = 0;
 		}
 //点击“步进”按钮的监听器
 		if (e.getSource()==stepbut) {
@@ -529,8 +558,252 @@ public class Tomasulo extends JFrame implements ActionListener{
 /*
  * (4)说明： Tomasulo算法实现
  */
+	public void initTime(){//初始化发射时间，执行时间以及写回时间，以及一些其他的东西吧
+		for(int i = 0; i < 6; i ++) {
+			istime[i] = -1;
+			exetime[i][0] = -1;
+			exetime[i][1] = -1;
+			wbtime[i] = -1;
+		}
+		for (int i = 0; i < 16; i ++) {
+			regsrc[i] = "";
+		}
+	}
+	
+	public void issue(){
+		int[] curr_inst = new int[4];
+		if (inst_pos > 5) {
+			return;
+		}
+		for(int i = 0; i < 4; i ++) {
+			curr_inst[i] = intv[inst_pos][i];
+			//System.out.print(curr_inst[i] + " ");
+		}
+		if (curr_inst[0] == 0) {//NOP
+			istime[inst_pos] = cnow;
+		}
+		else if(curr_inst[0] == 1) {//LD
+			int idx = -1;
+			/* for (idx = (loadhead + 1) % 3; idx != loadhead; idx = (idx + 1) % 3) {//寻找空闲load部件
+				if (my_load[idx + 1][1].equals("no")) {
+					break;
+				}
+			} */
+			for (int i = 0; i < 3; i ++) {//寻找空闲load部件
+				if (my_load[i + 1][1].equals("no")) {
+					idx = i;
+					break;
+				}
+			}
+			if (idx >= 0) {//有空闲
+				/* if (loadhead == -1) {
+					loadhead = 0;
+				} */
+				my_load[idx + 1][1] = "yes";
+				my_load[idx + 1][2] = String.valueOf(curr_inst[2]);
+				my_regsters[1][curr_inst[1] + 1] = my_load[idx + 1][0];
+				regsrc[curr_inst[1]] = my_load[idx + 1][0];
+				istime[inst_pos] = cnow;
+				my_inst_type[inst_pos + 1][1] = String.valueOf(istime[inst_pos]);
+				inst_rs[inst_pos] = idx + 1;
+				inst_pos ++;
+			}
+		}
+		else if(curr_inst[0] < 4) {//ADD or SUB
+			int idx = -1;
+			for (idx = 0; idx < 3; idx ++) {//寻找空闲Add部件
+				if (my_rs[idx + 1][2].equals("no")) {
+					break;
+				}
+			}
+			if (idx >= 0) {//有空闲
+				idx += 1;
+				if (!regsrc[curr_inst[2]].equals("")) {
+					my_rs[idx][6] = regsrc[curr_inst[2]];
+				}
+				else {
+					my_rs[idx][4] = "R[" + regist_table[curr_inst[2]] + "]";
+					my_rs[idx][6] = "";
+				}
+				if (!regsrc[curr_inst[3]].equals("")) {
+					my_rs[idx][7] = regsrc[curr_inst[3]];
+				}
+				else {
+					my_rs[idx][5] = "R[" + regist_table[curr_inst[3]] + "]";
+					my_rs[idx][7] = "";
+				}
+				my_rs[idx][2] = "yes";
+				my_regsters[1][curr_inst[1] + 1] = my_rs[idx][1];
+				regsrc[curr_inst[1]] = my_rs[idx][1];
+				my_rs[idx][3] = inst_type[curr_inst[0]];
+				istime[inst_pos] = cnow;
+				my_inst_type[inst_pos + 1][1] = String.valueOf(istime[inst_pos]);
+				inst_rs[inst_pos] = idx;
+				inst_pos ++;
+			}
+		}
+		else {//MULT or DIV
+			int idx = -1;
+			for (idx = 0; idx < 2; idx ++) {//寻找空闲Mult部件
+				if (my_rs[idx + 4][2].equals("no")) {
+					break;
+				}
+			}
+			if (idx >= 0) {//有空闲
+				idx += 4;
+				if (!regsrc[curr_inst[2]].equals("")) {
+					my_rs[idx][6] = regsrc[curr_inst[2]];
+				}
+				else {
+					my_rs[idx][4] = "R[" + regist_table[curr_inst[2]] + "]";
+					my_rs[idx][6] = "";
+				}
+				if (!regsrc[curr_inst[3]].equals("")) {
+					my_rs[idx][7] = regsrc[curr_inst[3]];
+				}
+				else {
+					my_rs[idx][5] = "R[" + regist_table[curr_inst[3]] + "]";
+					my_rs[idx][7] = "";
+				}
+				my_rs[idx][2] = "yes";
+				my_regsters[1][curr_inst[1] + 1] = my_rs[idx][1];
+				regsrc[curr_inst[1]] = my_rs[idx][1];
+				my_rs[idx][3] = inst_type[curr_inst[0]];
+				istime[inst_pos] = cnow;
+				my_inst_type[inst_pos + 1][1] = String.valueOf(istime[inst_pos]);
+				inst_rs[inst_pos] = idx;
+				inst_pos ++;
+			}
+		}
+	}
+
+	public boolean execute(int idx){
+		if (exetime[idx][0] < 0) {//还未执行
+			if (intv[idx][0] == 1) {//LD
+				int ldidx = inst_rs[idx];
+				exetime[idx][0] = cnow;
+				my_load[ldidx][2] = "R[" + rx[intv[idx][3]] + "]+" + my_load[ldidx][2];
+				my_inst_type[idx + 1][2] = String.valueOf(exetime[idx][0]) + "~";
+				ldrestime[ldidx] = time[0] - 1;
+			}
+			else if (intv[idx][0] > 1 && intv[idx][0] < 6) {//ADD, SUB, MULT, DIV
+				int rsidx = inst_rs[idx];
+				if (my_rs[rsidx][6].equals("") && my_rs[rsidx][7].equals("")) {
+					exetime[idx][0] = cnow;
+					my_inst_type[idx + 1][2] = String.valueOf(exetime[idx][0]) + "~";
+					if (intv[idx][0] < 4) {
+						calresttime[rsidx - 1] = time[1] - 1;
+					}
+					else {
+						calresttime[rsidx - 1] = time[intv[idx][0] - 2] - 1;
+					}
+					my_rs[rsidx][0] = String.valueOf(calresttime[rsidx - 1]);
+				}
+			}
+		}
+		else if (exetime[idx][0] > 0 && exetime[idx][1] < 0) {//正在执行
+			if (intv[idx][0] == 1){//LD
+				int ldidx = inst_rs[idx];
+				ldrestime[ldidx] --;
+				if (ldrestime[ldidx] == 0) {
+					exetime[idx][1] = cnow;
+					my_inst_type[idx + 1][2] = String.valueOf(exetime[idx][0]) + "~" + String.valueOf(exetime[idx][1]);
+					memcnt ++;
+					my_load[ldidx][3] = "M" + String.valueOf(memcnt) + " = M[" +my_load[ldidx][2] + "]";
+				}
+			}
+			else if (intv[idx][0] > 1 && intv[idx][0] < 6) {//ADD, SUB, MULT, DIV
+				int rsidx = inst_rs[idx];
+				calresttime[rsidx - 1] --;
+				my_rs[rsidx][0] = String.valueOf(calresttime[rsidx - 1]);
+				if (calresttime[rsidx - 1] == 0) {
+					exetime[idx][1] = cnow;
+					my_inst_type[idx + 1][2] = String.valueOf(exetime[idx][0]) + "~" + String.valueOf(exetime[idx][1]);
+					my_rs[rsidx][0] = "";
+				}
+			}
+		}
+		else if (exetime[idx][0] > 0 && exetime[idx][1] > 0) {//已执行完
+			return true;
+		}
+		return false;
+	}
+
+	public void writeResult(int idx){
+		if (wbtime[idx] > 0) {
+			return;
+		}
+		else {
+			if (intv[idx][0] == 1) {//LD
+				int ldidx = inst_rs[idx];
+				String fname = my_load[ldidx][0];
+				String content = my_load[ldidx][3].split(" ")[0];
+				for (int i = 0; i < 16; i ++) {
+					if (regsrc[i].equals(fname)) {
+						my_regsters[2][i + 1] = content;
+						regsrc[i] = "";
+					}
+				}
+				for (int i = 1; i < 6; i ++) {
+					if (my_rs[i][6].equals(fname)) {
+						my_rs[i][4] = content;
+						my_rs[i][6] = "";
+					}
+					if (my_rs[i][7].equals(fname)) {
+						my_rs[i][5] = content;
+						my_rs[i][7] = "";
+					}
+				}
+				my_load[ldidx][1] = "no";
+				my_load[ldidx][2] = "";
+				my_load[ldidx][3] = "";
+				wbtime[idx] = cnow;
+				my_inst_type[idx + 1][3] = String.valueOf(wbtime[idx]);
+			}
+			else if (intv[idx][0] >1 && intv[idx][0] < 6) {//FP
+				int rsidx = inst_rs[idx];
+				String fname = my_rs[rsidx][1];
+				memcnt ++;
+				String content = "M" + String.valueOf(memcnt);
+				for (int i = 0; i < 16; i ++) {
+					if (regsrc[i].equals(fname)) {
+						my_regsters[2][i + 1] = content;
+						regsrc[i] = "";
+					}
+				}
+				for (int i = 1; i < 6; i ++) {
+					if (my_rs[i][6].equals(fname)) {
+						my_rs[i][4] = content;
+						my_rs[i][6] = "";
+					}
+					if (my_rs[i][7].equals(fname)) {
+						my_rs[i][5] = content;
+						my_rs[i][7] = "";
+					}
+				}
+				my_rs[rsidx][2] = "no";
+				my_rs[rsidx][3] = "";
+				my_rs[rsidx][4] = "";
+				my_rs[rsidx][5] = "";
+				wbtime[idx] = cnow;
+				my_inst_type[idx + 1][3] = String.valueOf(wbtime[idx]);
+			}
+		}
+	}
+
 	public void core()
 	{
+		int pos = inst_pos;
+		boolean exe[] = new boolean[pos];
+		issue();
+		for (int i = 0; i < pos; i ++) {
+			exe[i] = execute(i);
+		}
+		for (int i = 0; i < pos; i ++) {
+			if (exe[i]) {
+				writeResult(i);
+			}
+		}
 	}
 
 	public static void main(String[] args) {
