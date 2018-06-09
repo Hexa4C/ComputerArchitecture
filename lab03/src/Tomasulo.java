@@ -793,7 +793,7 @@ public class Tomasulo extends JFrame implements ActionListener{
 
 	public void core()
 	{
-		int pos = inst_pos;
+		int pos = inst_pos;	
 		boolean exe[] = new boolean[pos];
 		issue();
 		for (int i = 0; i < pos; i ++) {
